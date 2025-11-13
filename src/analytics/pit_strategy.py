@@ -1,5 +1,69 @@
 from typing import List, Dict, Optional
 import numpy as np
+import pandas as pd
+
+
+def estimate_degradation_from_telemetry(telemetry_df: pd.DataFrame, 
+                                        vehicle_id: str,
+                                        early_laps: tuple = (1, 5),
+                                        late_laps: tuple = (15, 20)) -> float:
+    """Estimate tire degradation from actual lateral acceleration telemetry.
+    
+    Measures loss of lateral grip over stint by comparing max lateral G in early vs late laps.
+    
+    Args:
+        telemetry_df: Telemetry DataFrame (wide format preferred)
+        vehicle_id: Vehicle identifier
+        early_laps: (min, max) lap range for baseline performance
+        late_laps: (min, max) lap range for degraded performance
+        
+    Returns:
+        Estimated degradation rate (seconds/lap). Returns 0.15 as fallback if data insufficient.
+    """
+    try:
+        from src.telemetry_loader import get_vehicle_telemetry
+        
+        # Get lateral accel for early laps
+        early = get_vehicle_telemetry(telemetry_df, vehicle_id, 
+                                      parameter='accy_can', lap_range=early_laps)
+        # Get lateral accel for late laps
+        late = get_vehicle_telemetry(telemetry_df, vehicle_id, 
+                                     parameter='accy_can', lap_range=late_laps)
+        
+        if len(early) == 0 or len(late) == 0:
+            return 0.15  # Fallback to default
+        
+        # Extract values
+        early_values = pd.to_numeric(early['telemetry_value'], errors='coerce').dropna()
+        late_values = pd.to_numeric(late['telemetry_value'], errors='coerce').dropna()
+        
+        if len(early_values) < 10 or len(late_values) < 10:
+            return 0.15  # Insufficient data
+        
+        # Max lateral G (absolute value - can be left or right)
+        early_max_g = early_values.abs().quantile(0.95)  # 95th percentile for robustness
+        late_max_g = late_values.abs().quantile(0.95)
+        
+        # Loss of grip in G's
+        grip_loss = early_max_g - late_max_g
+        
+        # Convert to lap time degradation (rough approximation: 0.1G loss ≈ 0.3s/lap)
+        # Based on typical corner-limited behavior
+        lap_time_delta = grip_loss * 3.0
+        
+        # Normalize by lap count difference
+        lap_diff = (late_laps[0] + late_laps[1]) / 2 - (early_laps[0] + early_laps[1]) / 2
+        if lap_diff > 0:
+            degradation_rate = lap_time_delta / lap_diff
+        else:
+            degradation_rate = 0.15
+        
+        # Clamp to reasonable range (0.05 - 0.5 s/lap)
+        return max(0.05, min(0.5, degradation_rate))
+        
+    except Exception as e:
+        # Fallback on any error
+        return 0.15
 
 
 def recommend_pit(current_lap: int,
