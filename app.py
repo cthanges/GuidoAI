@@ -2,9 +2,11 @@ import streamlit as st
 import time
 import pandas as pd
 from src import data_loader
-from src.simulator import SimpleSimulator
-from src.analytics.pit_strategy import recommend_pit
+from src.simulator import SimpleSimulator, TelemetrySimulator
+from src.analytics.pit_strategy import recommend_pit, estimate_degradation_from_telemetry
 from src.analytics.caution_handler import recommend_under_caution
+from src.analytics.anomaly_detection import detect_all_anomalies, get_anomaly_summary
+from src import telemetry_loader
 
 
 st.set_page_config(page_title="Race Engineer MVP", layout='wide')
@@ -13,12 +15,22 @@ st.title('Race Engineer — Streamlit MVP')
 
 with st.sidebar:
     st.header('Dataset')
-    files = data_loader.list_lap_time_files()
-    if files:
-        choice = st.selectbox('Choose lap_time file', options=files)
+    
+    # File type selector
+    file_type = st.radio('Data Type', ['Lap Times', 'Telemetry'], index=0)
+    
+    if file_type == 'Lap Times':
+        files = data_loader.list_lap_time_files()
+        label = 'Choose lap_time file'
     else:
-        st.info('No lap_time files auto-detected in Datasets/. You can upload a CSV.')
-        choice = st.file_uploader('Upload lap_time CSV', type=['csv'])
+        files = telemetry_loader.list_telemetry_files()
+        label = 'Choose telemetry file'
+    
+    if files:
+        choice = st.selectbox(label, options=files)
+    else:
+        st.info(f'No {file_type.lower()} files auto-detected in Datasets/. You can upload a CSV.')
+        choice = st.file_uploader(f'Upload {file_type.lower()} CSV', type=['csv'])
 
     speed = st.slider('Replay speed (laps/sec)', 0.1, 5.0, 1.0)
     target_stint = st.number_input('Target stint (laps)', min_value=1, max_value=100, value=20)
@@ -27,30 +39,62 @@ with st.sidebar:
     total_race_laps = st.number_input('Total race laps (optional)', min_value=0, max_value=200, value=50)
 
 if not choice:
-    st.warning('Please select or upload a lap_time CSV to begin.')
+    st.warning(f'Please select or upload a {file_type.lower()} CSV to begin.')
     st.stop()
 
-if isinstance(choice, str):
-    df = data_loader.load_lap_time(choice)
-else:
-    df = pd.read_csv(choice)
-
-vehicle_ids = data_loader.vehicle_ids_from_lap_time(df)
-vehicle = None
-if vehicle_ids:
-    vehicle = st.selectbox('Vehicle', vehicle_ids)
-else:
-    st.warning('No vehicle_id column found in the selected file; the app will use entire file rows.')
-
-if vehicle:
-    vdf = data_loader.filter_vehicle_laps(df, vehicle)
-else:
-    vdf = df
-
-st.sidebar.markdown('---')
-st.sidebar.write('Rows for selected vehicle: %d' % len(vdf))
-
-sim = SimpleSimulator(vdf, speed=speed)
+# Load data based on file type
+if file_type == 'Lap Times':
+    if isinstance(choice, str):
+        df = data_loader.load_lap_time(choice)
+    else:
+        df = pd.read_csv(choice)
+    
+    vehicle_ids = data_loader.vehicle_ids_from_lap_time(df)
+    vehicle = None
+    if vehicle_ids:
+        vehicle = st.selectbox('Vehicle', vehicle_ids)
+    else:
+        st.warning('No vehicle_id column found in the selected file; the app will use entire file rows.')
+    
+    if vehicle:
+        vdf = data_loader.filter_vehicle_laps(df, vehicle)
+    else:
+        vdf = df
+    
+    st.sidebar.markdown('---')
+    st.sidebar.write('Rows for selected vehicle: %d' % len(vdf))
+    
+    sim = SimpleSimulator(vdf, speed=speed)
+    use_telemetry = False
+    telemetry_df = None
+    
+else:  # Telemetry mode
+    if isinstance(choice, str):
+        df = telemetry_loader.load_telemetry(choice, clean_data=True)
+    else:
+        df = pd.read_csv(choice)
+    
+    # Get vehicles from telemetry
+    vehicle_objs = telemetry_loader.get_vehicle_ids(df)
+    if vehicle_objs:
+        vehicle_options = [v.raw for v in vehicle_objs]
+        vehicle = st.selectbox('Vehicle', vehicle_options)
+    else:
+        st.warning('No vehicle_id column found in the selected file.')
+        vehicle = None
+    
+    if vehicle:
+        vdf = telemetry_loader.get_vehicle_telemetry(df, vehicle)
+    else:
+        vdf = df
+    
+    st.sidebar.markdown('---')
+    st.sidebar.write('Telemetry rows for selected vehicle: %d' % len(vdf))
+    
+    # Create telemetry simulator (aggregate by lap for now)
+    sim = TelemetrySimulator(vdf, speed=speed, aggregate_by_lap=True)
+    use_telemetry = True
+    telemetry_df = df  # Keep full telemetry for degradation estimation
 
 col1, col2 = st.columns([2, 1])
 
@@ -64,6 +108,13 @@ with col2:
     st.subheader('Pit Strategy')
     info_box = st.empty()
 
+# Add anomaly detection box for telemetry mode
+if use_telemetry:
+    st.markdown('---')
+    st.subheader('Anomaly Detection')
+    anomaly_box = st.empty()
+    run_anomaly_check = st.button('Run Anomaly Check')
+
 last_pit_lap = 0
 last_laps = []
 current_lap = 0
@@ -71,11 +122,41 @@ current_lap = 0
 if 'sim_pos' not in st.session_state:
     st.session_state['sim_pos'] = 0
 
+# Compute telemetry-based degradation if available
+if use_telemetry and vehicle and telemetry_df is not None:
+    try:
+        auto_degradation = estimate_degradation_from_telemetry(telemetry_df, vehicle)
+        st.sidebar.info(f'Auto-detected degradation: {auto_degradation:.3f} s/lap (from telemetry)')
+        # Override sidebar value
+        degradation_rate = auto_degradation
+    except Exception as e:
+        st.sidebar.warning(f'Could not auto-detect degradation: {str(e)}')
+
 def render_row(row):
     # display some useful fields
     timestamp = row.get('timestamp') if 'timestamp' in row.index else None
-    lap = int(row['lap']) if 'lap' in row.index and str(row['lap']).isdigit() else st.session_state['sim_pos']
+    
+    # Handle different data formats
+    if 'lap' in row.index:
+        lap_val = row['lap']
+        if pd.notna(lap_val) and str(lap_val).replace('.','').isdigit():
+            lap = int(float(lap_val))
+        else:
+            lap = st.session_state['sim_pos']
+    else:
+        lap = st.session_state['sim_pos']
+    
+    # For lap time data
     val = row.get('value') if 'value' in row.index else None
+    
+    # For telemetry aggregated data, try to get speed or lap time proxy
+    if val is None and use_telemetry:
+        # Try common aggregate columns
+        for col in ['Speed_mean', 'Speed', 'lap_time', 'value']:
+            if col in row.index and pd.notna(row[col]):
+                val = row[col]
+                break
+    
     return lap, timestamp, val
 
 
@@ -149,7 +230,11 @@ if st.button('Simulate Caution Now'):
     if pos > 0 and pos <= len(vdf):
         # recompute using last available lap
         row = vdf.iloc[min(pos - 1, len(vdf)-1)]
-        lap = int(row['lap']) if 'lap' in row.index and str(row['lap']).isdigit() else pos
+        if 'lap' in row.index:
+            lap_val = row['lap']
+            lap = int(float(lap_val)) if pd.notna(lap_val) and str(lap_val).replace('.','').isdigit() else pos
+        else:
+            lap = pos
         remaining = total_race_laps - lap if total_race_laps > lap else None
         rec = recommend_pit(
             lap, last_pit_lap, last_laps, 
@@ -162,3 +247,28 @@ if st.button('Simulate Caution Now'):
         st.json({'recommendation': rec, 'caution_decision': caution})
     else:
         st.warning('No lap in flight to base a caution decision on')
+
+# Anomaly detection (telemetry mode only)
+if use_telemetry and run_anomaly_check and vehicle and telemetry_df is not None:
+    with st.spinner('Running anomaly detection...'):
+        # Convert to wide format if needed
+        check_df = telemetry_df.copy()
+        if 'telemetry_name' in check_df.columns:
+            check_df = telemetry_loader.telemetry_to_wide_format(check_df)
+        
+        # Run checks
+        anomaly_results = detect_all_anomalies(check_df, vehicle_id=vehicle)
+        summary = get_anomaly_summary(anomaly_results)
+        
+        anomaly_box.markdown(f"**Anomaly Detection Results**")
+        anomaly_box.metric('Total Anomalies', summary['total_anomalies'])
+        
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric('🚨 Critical', summary['by_severity']['critical'])
+        col_b.metric('⚠️ Warnings', summary['by_severity']['warning'])
+        col_c.metric('ℹ️ Info', summary['by_severity']['info'])
+        
+        if summary['most_severe']:
+            st.markdown('**Most Severe Anomalies:**')
+            for anomaly in summary['most_severe']:
+                st.warning(str(anomaly))
