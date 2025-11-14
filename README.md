@@ -7,9 +7,10 @@ Real-time analytics tool that simulates race-engineering decision-making for opt
 ### Race Strategy
 - **Optimal Pit Window Calculator**: Multi-lap optimizer that evaluates candidate pit stops and selects the timing that minimizes total race time
 - **Traffic & Position Modeling**: Real-time field position tracking with undercut/overcut opportunity detection
+- **Probabilistic Caution Analysis**: Expected value calculation across multiple caution timing scenarios with confidence ratings
 - **Tyre Degradation Model**: Linear degradation model (configurable seconds/lap) OR auto-detected from telemetry lateral G forces
 - **Caution Handler**: Adjusts pit recommendations when yellow flags reduce pit-time cost
-- **Interactive Tuning**: Adjust pit cost, degradation rate, target stint, and race length via UI controls
+- **Interactive Tuning**: Adjust pit cost, degradation rate, target stint, race length, and caution probability via UI controls
 
 ### Data Replay
 - **Lap-Level Replay**: Step through or auto-replay lap timing data with real-time recommendations
@@ -85,6 +86,24 @@ pytest -v
 - **Tyre degradation**: Lap time increase per lap (seconds/lap) — auto-detected in telemetry mode
 - **Total race laps**: Used to compute remaining laps for optimization window
 
+### Caution Probability (Optional)
+1. Check **"Enable caution analysis"** in the sidebar
+2. Adjust **"Expected cautions per race"** slider (0.0-5.0, default 2.0)
+3. Enable **"Show detailed scenarios"** to see probability distribution
+4. The app will display:
+   - Recommended strategy (⛽ Pit Now / ⏳ Wait for Caution / 🎯 Optimal Timing)
+   - Confidence level (✅ High / ⚠️ Medium / ❌ Low)
+   - Expected time savings in seconds
+   - Caution probability for next 10 laps (progress bar)
+   - Scenario breakdown table (if details enabled)
+   - Strategy comparison with expected times
+5. The system evaluates three strategies:
+   - **Pit Now**: Pay full pit cost, no caution benefit
+   - **Wait for Caution**: Gamble on caution coming soon (50% pit cost)
+   - **Optimal Timing**: Stick to recommended pit lap
+6. Uses probability-weighted expected value across all scenarios
+7. Factors in tire degradation cost of waiting vs pit time savings
+
 ## Files
 
 ### Core Modules
@@ -93,9 +112,9 @@ pytest -v
 - `src/simulator.py` — Lap-level and **telemetry-level replay engines** (SimpleSimulator, TelemetrySimulator)
 
 ### Analytics
-- `src/analytics/pit_strategy.py` — **Multi-lap pit window optimizer** with telemetry-based degradation estimation and traffic integration
+- `src/analytics/pit_strategy.py` — **Multi-lap pit window optimizer** with telemetry-based degradation estimation, traffic integration, and caution probability analysis
 - `src/analytics/traffic_model.py` — **Field position tracking** and undercut/overcut detection
-- `src/analytics/caution_handler.py` — Caution decision logic
+- `src/analytics/caution_handler.py` — **Probabilistic caution modeling** with expected value calculations and scenario analysis
 - `src/analytics/anomaly_detection.py` — **Real-time anomaly detection** (engine, brakes, performance)
 
 ### Testing
@@ -103,8 +122,9 @@ pytest -v
 - `tests/test_telemetry_loader.py` — Unit tests for telemetry loader (14 tests)
 - `tests/test_telemetry_integration.py` — **Integration tests for telemetry features** (11 tests)
 - `tests/test_traffic_model.py` — **Unit tests for traffic model** (20 tests)
+- `tests/test_caution_handler.py` — **Unit tests for probabilistic caution modeling** (22 tests)
 
-**Total: 49 tests, all passing ✓**
+**Total: 71 tests, all passing ✓**
 
 ## Telemetry Support
 
@@ -162,8 +182,18 @@ The traffic model is optional and can be enabled/disabled in the UI. When enable
 
 - ~~Integrate telemetry-based degradation (actual G-forces vs fixed rate)~~ ✓ Complete
 - ~~Traffic and field-position modeling for undercut/overcut scenarios~~ ✓ Complete
+- ~~Probabilistic caution modeling (expected value with risk)~~ ✓ Complete
 - Add sector-level replay using distance-from-start telemetry
 - Incorporate fuel model and compound-specific degradation curves
-- Probabilistic caution modeling (expected value with risk)
 - Monte Carlo simulation for uncertainty quantification
 - Richer UI with degradation charts and pit window visualization
+
+## Priorities Checklist
+
+### Real-Time Analytics (Core Requirements)
+- ✅ **Priority 1**: Multi-lap pit window optimizer
+- ✅ **Priority 2**: Traffic/field position model with undercut detection
+- ✅ **Priority 3**: Probabilistic caution handling with expected value analysis
+- ✅ **Priority 4**: Telemetry integration with anomaly detection
+
+**Status**: All core priorities complete! 🎉
