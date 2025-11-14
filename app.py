@@ -11,9 +11,65 @@ from src.analytics.traffic_model import TrafficModel
 from src import telemetry_loader
 
 
-st.set_page_config(page_title="Race Engineer MVP", layout='wide')
+st.set_page_config(page_title="GuidoAI", layout='wide', page_icon="Logo.png")
 
-st.title('Race Engineer — Streamlit MVP')
+# Custom CSS for cornflower blue theme
+st.markdown("""
+<style>
+    /* Primary buttons */
+    .stButton > button {
+        background-color: #6495ed;
+        color: white;
+    }
+    .stButton > button:hover {
+        background-color: #4169e1;
+        color: white;
+    }
+    
+    /* Radio buttons (Data Type selector) */
+    div[role="radiogroup"] label[data-baseweb="radio"] > div:first-child {
+        background-color: #6495ed !important;
+    }
+    div[role="radiogroup"] label[data-baseweb="radio"] input:checked ~ div:first-child {
+        background-color: #6495ed !important;
+        border-color: #6495ed !important;
+    }
+    
+    /* Sliders */
+    .stSlider > div > div > div > div {
+        background-color: #6495ed !important;
+    }
+    div[data-baseweb="slider"] > div > div {
+        background-color: #6495ed !important;
+    }
+    div[data-baseweb="slider"] [role="slider"] {
+        background-color: #6495ed !important;
+    }
+    
+    /* Progress bars */
+    .stProgress > div > div > div > div {
+        background-color: #6495ed !important;
+    }
+    div[role="progressbar"] > div {
+        background-color: #6495ed !important;
+    }
+    
+    /* Selectbox and other inputs focus */
+    .stSelectbox > div > div:focus-within,
+    .stTextInput > div > div:focus-within,
+    .stNumberInput > div > div:focus-within {
+        border-color: #6495ed !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Display logo and title
+col1, col2 = st.columns([1, 5])
+with col1:
+    st.image("Logo.png", width=100)
+with col2:
+    st.title('GuidoAI — AI Race Strategist')
+    st.caption('Pit stop perfection, powered by data 🏁')
 
 with st.sidebar:
     st.header('Dataset')
