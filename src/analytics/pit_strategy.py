@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 import numpy as np
 import pandas as pd
 from src.analytics.traffic_model import TrafficModel, TrafficOpportunity
+from src.analytics.caution_handler import analyze_caution_scenarios
 
 
 def estimate_degradation_from_telemetry(telemetry_df: pd.DataFrame, 
@@ -76,7 +77,10 @@ def recommend_pit(current_lap: int,
                   degradation_per_lap: float = 0.15,
                   traffic_model: Optional[TrafficModel] = None,
                   car_number: Optional[int] = None,
-                  consider_traffic: bool = True) -> Dict:
+                  consider_traffic: bool = True,
+                  consider_caution: bool = False,
+                  total_laps: Optional[int] = None,
+                  cautions_per_race: float = 2.0) -> Dict:
     """Multi-lap pit window optimizer that computes expected time-to-finish for candidate strategies.
 
     Strategy:
@@ -86,6 +90,7 @@ def recommend_pit(current_lap: int,
        - Fresh tyre benefit (reset degradation after pit)
        - Pit time cost
        - Traffic impact (optional, if traffic_model provided)
+       - Caution probability (optional, if consider_caution=True)
     3. Return the pit lap that minimizes total expected time.
 
     Args:
@@ -99,6 +104,9 @@ def recommend_pit(current_lap: int,
         traffic_model: Optional TrafficModel for position-aware recommendations
         car_number: Your car number (required if traffic_model provided)
         consider_traffic: Whether to factor traffic into decision (default True)
+        consider_caution: Whether to factor caution probability (default False)
+        total_laps: Total race laps (required if consider_caution=True)
+        cautions_per_race: Expected number of cautions (default 2.0)
 
     Returns:
         Dict with keys:
@@ -109,6 +117,7 @@ def recommend_pit(current_lap: int,
         - field_position: Current position (if traffic_model provided)
         - position_after_pit: Expected position after pit (if traffic_model provided)
         - undercut_opportunities: List of undercut chances (if traffic_model provided)
+        - caution_analysis: Probabilistic caution analysis (if consider_caution=True)
     """
     current_stint = current_lap - last_pit_lap
     
@@ -269,6 +278,35 @@ def recommend_pit(current_lap: int,
         result.update(traffic_info)
         
         return result
+    
+    # Caution probability analysis (if enabled)
+    if consider_caution and total_laps and result.get('recommended_lap'):
+        try:
+            caution_analysis = analyze_caution_scenarios(
+                current_lap=current_lap,
+                pit_recommendation=result,
+                pit_time_cost=pit_time_cost,
+                total_laps=total_laps,
+                laps_since_pit=current_stint,
+                baseline_lap_time=baseline_lap_time,
+                degradation_per_lap=degradation_per_lap,
+                cautions_per_race=cautions_per_race
+            )
+            result['caution_analysis'] = caution_analysis
+            
+            # Potentially override recommendation based on caution probability
+            if caution_analysis['recommended_strategy'] == 'wait_for_caution':
+                result['reason'] = 'wait_for_caution'
+                result['original_recommendation'] = result['recommended_lap']
+                result['recommended_lap'] = None  # Wait instead
+            elif caution_analysis['recommended_strategy'] == 'pit_now':
+                result['reason'] = 'pit_now_caution_unlikely'
+                result['recommended_lap'] = current_lap + 1  # Pit ASAP
+        except Exception as e:
+            # Don't fail entire recommendation if caution analysis fails
+            result['caution_analysis'] = {'error': str(e)}
+    
+    return result
 
 
 def _compute_stint_time(baseline_lap_time: float,
