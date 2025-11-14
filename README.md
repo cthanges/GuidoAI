@@ -6,6 +6,7 @@ Real-time analytics tool that simulates race-engineering decision-making for opt
 
 ### Race Strategy
 - **Optimal Pit Window Calculator**: Multi-lap optimizer that evaluates candidate pit stops and selects the timing that minimizes total race time
+- **Traffic & Position Modeling**: Real-time field position tracking with undercut/overcut opportunity detection
 - **Tyre Degradation Model**: Linear degradation model (configurable seconds/lap) OR auto-detected from telemetry lateral G forces
 - **Caution Handler**: Adjusts pit recommendations when yellow flags reduce pit-time cost
 - **Interactive Tuning**: Adjust pit cost, degradation rate, target stint, and race length via UI controls
@@ -27,8 +28,10 @@ The optimizer evaluates multiple candidate pit laps (e.g., lap 11, 12, 13...) an
 2. Pit time cost
 3. Time on fresh tyres after pit (with degradation reset)
 4. Total expected race time
+5. **Field position changes** (with traffic model enabled)
+6. **Undercut/overcut opportunities** based on competitor tire age
 
-It selects the pit lap that minimizes total time and reports the expected time saved vs. no-pit baseline.
+It selects the pit lap that minimizes total time and reports the expected time saved vs. no-pit baseline. When traffic modeling is enabled, it also identifies strategic opportunities to gain positions through timing differences.
 
 ## How to Run (Local)
 
@@ -66,6 +69,16 @@ pytest -v
 4. **Degradation is auto-detected** from lateral G forces (early vs late laps)
 5. Click **"Run Anomaly Check"** to scan for mechanical issues
 
+### Traffic Model (Optional)
+1. Check **"Enable traffic analysis"** in the sidebar
+2. Select an endurance analysis CSV file (contains lap-by-lap timing data with `NUMBER`, `LAP_NUMBER`, `ELAPSED` columns)
+3. The app will display:
+   - Current field position (P1, P2, etc.)
+   - Gap to leader and car ahead
+   - Expected position change after pit stop
+   - Undercut/overcut opportunities with confidence ratings
+4. Pit recommendations will highlight undercut opportunities as `reason: 'undercut_opportunity'`
+
 ### Sidebar Controls
 - **Target stint**: Fallback max stint length (laps)
 - **Pit time cost**: Time lost in pit (seconds)
@@ -80,7 +93,8 @@ pytest -v
 - `src/simulator.py` — Lap-level and **telemetry-level replay engines** (SimpleSimulator, TelemetrySimulator)
 
 ### Analytics
-- `src/analytics/pit_strategy.py` — **Multi-lap pit window optimizer** with telemetry-based degradation estimation
+- `src/analytics/pit_strategy.py` — **Multi-lap pit window optimizer** with telemetry-based degradation estimation and traffic integration
+- `src/analytics/traffic_model.py` — **Field position tracking** and undercut/overcut detection
 - `src/analytics/caution_handler.py` — Caution decision logic
 - `src/analytics/anomaly_detection.py` — **Real-time anomaly detection** (engine, brakes, performance)
 
@@ -88,8 +102,9 @@ pytest -v
 - `tests/test_pit_strategy.py` — Unit tests for pit optimizer (4 tests)
 - `tests/test_telemetry_loader.py` — Unit tests for telemetry loader (14 tests)
 - `tests/test_telemetry_integration.py` — **Integration tests for telemetry features** (11 tests)
+- `tests/test_traffic_model.py` — **Unit tests for traffic model** (20 tests)
 
-**Total: 29 tests, all passing ✓**
+**Total: 49 tests, all passing ✓**
 
 ## Telemetry Support
 
@@ -102,12 +117,53 @@ The project includes comprehensive telemetry data handling with robust data qual
 
 See [TELEMETRY_GUIDE.md](TELEMETRY_GUIDE.md) for detailed documentation and examples.
 
+## Traffic Model
+
+The traffic model reconstructs field positions from lap-by-lap elapsed times and provides strategic insights:
+
+### Key Features
+- **Running Order Tracking**: Computes positions, gaps to leader/ahead for each lap
+- **Position Estimation**: Predicts field position after pit stops based on expected time loss
+- **Undercut Detection**: Identifies cars on older tires vulnerable to undercut strategy
+- **Overcut Detection**: Finds opportunities to stay out longer and gain track position
+- **Traffic Impact**: Calculates time loss from following other cars
+
+### Data Format
+Requires endurance analysis CSV with columns:
+- `NUMBER` (or `NUM`): Car number
+- `LAP_NUMBER`: Lap number (1-indexed)
+- `ELAPSED`: Cumulative race time in `MM:SS.mmm` or `HH:MM:SS.mmm` format
+
+Example:
+```
+NUMBER; LAP_NUMBER; ELAPSED
+13;1;1:40.123
+22;1;1:42.456
+13;2;3:20.246
+22;2;3:24.912
+```
+
+### Undercut Logic
+An undercut is recommended when:
+1. Car ahead is on tires 5+ laps older
+2. Expected tire advantage + undercut bonus > gap + pit time loss
+3. Confidence based on tire age delta and gap size:
+   - **High**: >2s net advantage, >10 laps on tires
+   - **Medium**: >1s net advantage, >7 laps on tires
+   - **Low**: Marginal advantage
+
+### Integration
+The traffic model is optional and can be enabled/disabled in the UI. When enabled, pit recommendations include:
+- `field_position`: Current track position (1-20)
+- `position_after_pit`: Estimated position after stop
+- `undercut_opportunities`: List of strategic targets with confidence ratings
+
 ## Next Steps
 
-- Integrate telemetry-based degradation (actual G-forces vs fixed rate)
+- ~~Integrate telemetry-based degradation (actual G-forces vs fixed rate)~~ ✓ Complete
+- ~~Traffic and field-position modeling for undercut/overcut scenarios~~ ✓ Complete
 - Add sector-level replay using distance-from-start telemetry
 - Incorporate fuel model and compound-specific degradation curves
-- Traffic and field-position modeling for undercut/overcut scenarios
 - Probabilistic caution modeling (expected value with risk)
 - Monte Carlo simulation for uncertainty quantification
 - Richer UI with degradation charts and pit window visualization
