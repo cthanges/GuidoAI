@@ -3,7 +3,7 @@ import time
 import pandas as pd
 from pathlib import Path
 from src import data_loader
-from src.simulator import SimpleSimulator, TelemetrySimulator
+from src.simulator import BasicSimulator, TelemetrySimulator
 from src.analytics.pit_strategy import recommend_pit, estimate_degradation_from_telemetry
 from src.analytics.caution_handler import recommend_under_caution
 from src.analytics.anomaly_detection import detect_all_anomalies, get_anomaly_summary
@@ -244,7 +244,7 @@ with tab2:
         else:
             vdf = df
         
-        sim = SimpleSimulator(vdf, speed=speed)
+        sim = BasicSimulator(vdf, speed=speed)
         use_telemetry = False
         telemetry_df = None
         
