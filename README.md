@@ -111,7 +111,7 @@ pytest -v
 ### Core Modules
 - `src/data_loader.py` — Helpers to find/load lap_time CSVs
 - `src/telemetry_loader.py` — **Robust telemetry data loader** with data quality handling (see [TELEMETRY_GUIDE.md](TELEMETRY_GUIDE.md))
-- `src/simulator.py` — Lap-level and **telemetry-level replay engines** (SimpleSimulator, TelemetrySimulator)
+- `src/simulator.py` — Lap-level and **telemetry-level replay engines** (BasicSimulator, TelemetrySimulator)
 
 ### Analytics
 - `src/analytics/pit_strategy.py` — **Multi-lap pit window optimizer** with telemetry-based degradation estimation, traffic integration, and caution probability analysis
