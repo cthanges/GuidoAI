@@ -4,30 +4,33 @@ import pandas as pd
 from typing import List
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATASETS_DIR = os.path.join(ROOT, 'Datasets')
-
+DATASETS_DIR = os.path.join(ROOT, 'Datasets') # Directory containing the datasets
 
 def list_lap_time_files() -> List[str]:
-    """Return absolute paths to lap_time CSV files under Datasets/ (recursively)."""
+    # Search recursively for lap_time files in the datasets directory
     pattern = os.path.join(DATASETS_DIR, '**', '*lap_time*.*')
     files = glob.glob(pattern, recursive=True)
-    # filter by common csv extensions
-    return [f for f in files if f.lower().endswith('.csv') or f.lower().endswith('.txt')]
+
+    # Return list of absolute paths
+    return [f for f in files if f.lower().endswith('.csv')]
 
 
 def load_lap_time(path: str) -> pd.DataFrame:
-    """Load a lap_time CSV and parse a timestamp column if present.
-
-    Expect columns like: lap, timestamp, value, vehicle_id (based on dataset samples).
-    """
+    # Load the lap time data from the files
     df = pd.read_csv(path, dtype=str)
-    # try to coerce common column names and types
-    for c in ['timestamp', 'value']:
+    
+    # Convert timestamp columns to datetime for time-based operations
+    for c in ['timestamp', 'meta_time']:
         if c in df.columns:
             try:
                 df[c] = pd.to_datetime(df[c], errors='coerce')
             except Exception:
                 pass
+    
+    # Convert 'value' column (lap time in milliseconds) to numeric
+    if 'value' in df.columns:
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+    
     return df
 
 
