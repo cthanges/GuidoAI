@@ -30,34 +30,16 @@ class BasicSimulator: # Replay lap-by-lap race data (one lap at a time)
             yield row
             delay(max(0.01, 1.0 / self.speed)) # Basic pacing: 1.0 / speed seconds between laps
 
-class TelemetrySimulator:
-    """High-frequency telemetry simulator that replays sensor data.
-    
-    Unlike BasicSimulator (lap-level), this operates at telemetry frequency (10-100+ Hz)
-    and can aggregate data per lap for real-time analytics.
-    """
-    
-    def __init__(self, telemetry_df: pd.DataFrame, speed: float = 1.0, 
-                 aggregate_by_lap: bool = True, sample_rate_hz: float = 10.0):
-        """Initialize telemetry simulator.
-        
-        Args:
-            telemetry_df: DataFrame with telemetry data (long or wide format)
-            speed: Replay speed multiplier (1.0 = real-time)
-            aggregate_by_lap: If True, yield one aggregated row per lap
-            sample_rate_hz: Telemetry sampling rate (for pacing if aggregate_by_lap=False)
-        """
-        # Ensure sorted by timestamp (prefer meta_time)
+class TelemetrySimulator: # Replay high-frequency telemetry data
+    def __init__(self, telemetry_df: pd.DataFrame, speed: float = 1.0, aggregate_by_lap: bool = True, sample_rate_hz: float = 10.0):
+        # Sort data chronologically (meta_time preferred)
         time_col = 'meta_time' if 'meta_time' in telemetry_df.columns else 'timestamp'
         self.data = telemetry_df.sort_values(time_col).reset_index(drop=True)
         self.pos = 0
         self.speed = float(speed) if speed > 0 else 1.0
         self.aggregate_by_lap = aggregate_by_lap
         self.sample_rate_hz = sample_rate_hz
-        
-        # Detect format (long vs wide)
-        self.is_long_format = 'telemetry_name' in self.data.columns
-        
+        self.is_long_format = 'telemetry_name' in self.data.columns # Use long format if 'telemetry_name' column exists
         # Pre-aggregate by lap if requested and format allows
         if aggregate_by_lap and 'lap' in self.data.columns:
             self._prepare_lap_aggregates()
