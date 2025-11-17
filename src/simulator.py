@@ -2,47 +2,38 @@ import time
 import pandas as pd
 from typing import Iterator, Optional, List
 
-
-class SimpleSimulator:
-    """A tiny lap-level simulator that yields lap rows one-by-one.
-
-    The simulator expects a pandas DataFrame where each row represents a lap event
-    for a single vehicle (for MVP we operate at lap granularity).
-    """
-
+# Two simulator classes for real-time analysis
+class BasicSimulator: # Replay lap-by-lap race data (one lap at a time)
     def __init__(self, laps_df, speed: float = 1.0):
-        # laps_df is expected to be ordered by timestamp
+        # Reset the index to ensure sequential access
         self.laps = laps_df.reset_index(drop=True)
         self.pos = 0
         self.speed = float(speed) if speed > 0 else 1.0
 
     def has_next(self) -> bool:
+        # Set to True if more laps are available
         return self.pos < len(self.laps)
 
     def next(self):
+        # Stop if there are no more laps
         if not self.has_next():
             raise StopIteration
-        row = self.laps.iloc[self.pos]
-        self.pos += 1
+        row = self.laps.iloc[self.pos] # Get the current lap
+        self.pos += 1 # Move to the next lap
         return row
 
     def replay(self, delay_callback=None) -> Iterator[object]:
-        """Yield rows with a small sleep between them scaled by speed.
-
-        delay_callback(optional): function(seconds) -> None; called to sleep, can be time.sleep
-        """
+        # Yield the laps one-by-one with delays
         delay = delay_callback or time.sleep
         while self.has_next():
             row = self.next()
             yield row
-            # basic pacing: 1.0 / speed seconds between steps
-            delay(max(0.01, 1.0 / self.speed))
-
+            delay(max(0.01, 1.0 / self.speed)) # Basic pacing: 1.0 / speed seconds between laps
 
 class TelemetrySimulator:
     """High-frequency telemetry simulator that replays sensor data.
     
-    Unlike SimpleSimulator (lap-level), this operates at telemetry frequency (10-100+ Hz)
+    Unlike BasicSimulator (lap-level), this operates at telemetry frequency (10-100+ Hz)
     and can aggregate data per lap for real-time analytics.
     """
     
@@ -121,7 +112,7 @@ class TelemetrySimulator:
         delay = delay_callback or time.sleep
         
         if self.aggregate_by_lap:
-            # Lap-level replay (similar to SimpleSimulator)
+            # Lap-level replay (similar to BasicSimulator)
             while self.has_next():
                 row = self.next()
                 yield row
