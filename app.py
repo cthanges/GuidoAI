@@ -11,7 +11,7 @@ from src.analytics.traffic_model import TrafficModel
 from src import telemetry_loader
 
 
-st.set_page_config(page_title="GuidoAI", layout='wide', page_icon="Logo.png")
+st.set_page_config(page_title="GuidoPro", layout='wide', page_icon="Logo.png")
 
 # Custom CSS for cornflower blue theme
 st.markdown("""
@@ -68,7 +68,7 @@ col1, col2 = st.columns([1, 5])
 with col1:
     st.image("Logo.png", width=100)
 with col2:
-    st.title('GuidoAI — AI Race Strategist')
+    st.title('GuidoPro — Professional Race Strategist')
     st.caption('Pit stop perfection, powered by data 🏁')
 
 # Main workflow tabs
@@ -400,7 +400,7 @@ with tab3:
     st.markdown("---")
     st.subheader("ℹ️ About")
     st.markdown("""
-    **GuidoAI** uses AI-powered analytics to optimize race strategy:
+    **GuidoPro** uses advanced analytics to optimize race strategy:
     - Multi-lap pit window optimization
     - Probabilistic caution modeling
     - Traffic-aware position tracking
