@@ -1,4 +1,4 @@
-# GuidoAI
+# GuidoPro
 
 **AI-Powered Race Strategy Analytics**
 
