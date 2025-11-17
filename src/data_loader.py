@@ -43,6 +43,7 @@ def filter_vehicle_laps(df: pd.DataFrame, vehicle_id: str) -> pd.DataFrame:
         d = df[df['vehicle_id'] == vehicle_id].copy()
     else:
         d = df.copy()
+        
     # Sort by timestamp chronologically if available
     if 'timestamp' in d.columns:
         d = d.sort_values('timestamp')
