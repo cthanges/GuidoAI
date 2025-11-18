@@ -69,7 +69,7 @@ with col1:
     st.image("Logo.png", width=100)
 with col2:
     st.title('GuidoPro — Professional Race Strategist')
-    st.caption('Pit stop perfection, powered by data 🏁')
+    st.caption('Pit Stop! 🏁')
 
 # Main workflow tabs
 tab1, tab2, tab3 = st.tabs(["📁 Setup", "🏁 Race Analysis", "🔧 Advanced Settings"])
