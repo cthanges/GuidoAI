@@ -98,14 +98,14 @@ def infer_lap_from_timestamp(df: pd.DataFrame, timestamp_col: str = 'timestamp')
     else:
         df_work = df_work.sort_values(timestamp_col)
     
-    # Compute time deltas
+    # Compute time deltas between consecutive rows
     if 'vehicle_id' in df_work.columns:
         df_work['_time_delta'] = df_work.groupby('vehicle_id')[timestamp_col].diff().dt.total_seconds()
     else:
         df_work['_time_delta'] = df_work[timestamp_col].diff().dt.total_seconds()
     
     # Detect new laps (based on time gaps)
-    LAP_GAP_THRESHOLD = 60.0
+    LAP_GAP_THRESHOLD = 60.0 # when gap > 60 seconds, consider it a new lap
     df_work['_new_lap'] = (df_work['_time_delta'] > LAP_GAP_THRESHOLD) | (df_work['_time_delta'].isna())
     
     # Generate the lap numbers using the cumulative sum
@@ -148,7 +148,6 @@ def clean_lap_numbers(df: pd.DataFrame, lap_col: str = 'lap', timestamp_col: str
     
     return df
 
-
 def list_telemetry_files() -> List[str]:
     # Search recursively for telemetry CSV files in the datasets directory
     pattern = os.path.join(DATASETS_DIR, '**', '*telemetry*.*')
@@ -157,24 +156,11 @@ def list_telemetry_files() -> List[str]:
     # Return list of absolute paths (excluding __MACOSX folders)
     return [f for f in files if f.lower().endswith('.csv') and '__MACOSX' not in f]
 
-
 def load_telemetry(path: str, clean_data: bool = True) -> pd.DataFrame:
-    """Load telemetry CSV with robust error handling.
-    
-    Args:
-        path: Path to telemetry CSV
-        clean_data: If True, apply data quality fixes (lap cleaning, timestamp parsing)
-        
-    Returns:
-        DataFrame with telemetry data
-        
-    Notes:
-        - meta_time: When message was received (reliable)
-        - timestamp: ECU time (may be inaccurate)
-        - Prefer meta_time for ordering when available
-    """
+    # Load the telemetry CSV file
     df = pd.read_csv(path, dtype={'lap': str, 'vehicle_number': str, 'car_number': str})
-    
+
+    # Exit early if raw data is requested (i.e. no cleaning)
     if not clean_data:
         return df
     
@@ -183,37 +169,23 @@ def load_telemetry(path: str, clean_data: bool = True) -> pd.DataFrame:
         if time_col in df.columns:
             df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
     
-    # Clean lap numbers
+    # Call the lap cleaning function ('meta_time' preferred if available)
     df = clean_lap_numbers(df, lap_col='lap', timestamp_col='meta_time' if 'meta_time' in df.columns else 'timestamp')
     
-    # Sort by reliable timestamp (prefer meta_time)
+    # Sort by reliable timestamp ('meta_time' preferred if available as time on ECU may not be accurate)
     sort_col = 'meta_time' if 'meta_time' in df.columns else 'timestamp'
     if sort_col in df.columns:
         df = df.sort_values(sort_col)
     
     return df.reset_index(drop=True)
 
-
-def get_vehicle_telemetry(df: pd.DataFrame, vehicle_id: str, 
-                          parameter: Optional[str] = None,
-                          lap_range: Optional[Tuple[int, int]] = None) -> pd.DataFrame:
-    """Extract telemetry for a specific vehicle and optional parameter/lap range.
-    
-    Args:
-        df: Telemetry DataFrame
-        vehicle_id: Vehicle identifier (e.g., "GR86-004-78" or just chassis "004")
-        parameter: Optional telemetry parameter name to filter
-        lap_range: Optional (min_lap, max_lap) tuple to filter laps
-        
-    Returns:
-        Filtered DataFrame
-    """
-    result = df.copy()
+def get_vehicle_telemetry(df: pd.DataFrame, vehicle_id: str, parameter: Optional[str] = None, lap_range: Optional[Tuple[int, int]] = None) -> pd.DataFrame:
+    result = df.copy() # Create a working copy
     
     # Filter by vehicle
     if 'vehicle_id' in result.columns:
-        # Support partial matching (e.g., chassis only)
-        result = result[result['vehicle_id'].str.contains(vehicle_id, na=False)]
+        # Support partial matching (Ex. chassis only)
+        result = result[result['vehicle_id'].str.contains(vehicle_id, na=False)] # NaN values are non-matches, they don't count
     
     # Filter by parameter
     if parameter and 'telemetry_name' in result.columns:
@@ -226,84 +198,47 @@ def get_vehicle_telemetry(df: pd.DataFrame, vehicle_id: str,
     
     return result.reset_index(drop=True)
 
-
 def get_available_parameters(df: pd.DataFrame) -> List[str]:
-    """Get list of available telemetry parameters in dataset.
-    
-    Args:
-        df: Telemetry DataFrame
-        
-    Returns:
-        Sorted list of unique parameter names
-    """
+    # List all available telemetry parameters in dataset
     if 'telemetry_name' not in df.columns:
         return []
+
     return sorted(df['telemetry_name'].dropna().unique().tolist())
 
 
 def get_vehicle_ids(df: pd.DataFrame) -> List[VehicleID]:
-    """Extract and parse all vehicle IDs from dataset.
-    
-    Args:
-        df: DataFrame with vehicle_id column
-        
-    Returns:
-        List of parsed VehicleID objects
-    """
+    # Extract and parse all unique vehicle IDs from the dataset
     if 'vehicle_id' not in df.columns:
         return []
     
     raw_ids = df['vehicle_id'].dropna().unique().tolist()
-    parsed = [parse_vehicle_id(vid) for vid in raw_ids]
+    parsed = [parse_vehicle_id(vid) for vid in raw_ids] # Call parser on each ID
+
     return [v for v in parsed if v is not None]
 
 
-def telemetry_to_wide_format(df: pd.DataFrame, 
-                             index_cols: List[str] = ['meta_time', 'vehicle_id', 'lap']) -> pd.DataFrame:
-    """Convert long-format telemetry (one row per parameter) to wide format (one row per timestamp).
-    
-    Args:
-        df: Long-format telemetry DataFrame
-        index_cols: Columns to use as index (timestamp, vehicle, lap)
-        
-    Returns:
-        Wide-format DataFrame with parameters as columns
-        
-    Example:
-        Input:
-            meta_time | vehicle_id | lap | telemetry_name | telemetry_value
-            10:00:00  | GR86-004   | 1   | Speed          | 150
-            10:00:00  | GR86-004   | 1   | aps            | 85
-            
-        Output:
-            meta_time | vehicle_id | lap | Speed | aps
-            10:00:00  | GR86-004   | 1   | 150   | 85
-    """
+def telemetry_to_wide_format(df: pd.DataFrame, index_cols: List[str] = ['meta_time', 'vehicle_id', 'lap']) -> pd.DataFrame:
+    # Make sure that 'telemetry_name' and 'telemetry_value' columns exist
     if 'telemetry_name' not in df.columns or 'telemetry_value' not in df.columns:
         return df
     
-    # Keep only relevant columns
+    # Select relevant columns only
     cols = index_cols + ['telemetry_name', 'telemetry_value']
     available_cols = [c for c in cols if c in df.columns]
     df_subset = df[available_cols].copy()
     
-    # Pivot
+    # Create pivot table (this makes it wide format)
     pivot_df = df_subset.pivot_table(
         index=[c for c in index_cols if c in df_subset.columns],
         columns='telemetry_name',
         values='telemetry_value',
-        aggfunc='first'  # Take first value if duplicates
+        aggfunc='first' # If a duplicate exists, take the first value
     ).reset_index()
     
     return pivot_df
 
-
 def validate_telemetry_quality(df: pd.DataFrame) -> Dict[str, any]:
-    """Run data quality checks on telemetry data.
-    
-    Returns:
-        Dictionary with quality metrics and warnings
-    """
+    # Run data quality checks on telemetry data (we need to account for all the known issues in the files)
     report = {
         'total_rows': len(df),
         'invalid_laps': 0,
