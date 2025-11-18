@@ -62,18 +62,18 @@ class VehicleID:
         return f"Chassis {self.chassis_number} (Car # not assigned)"
 
 def parse_vehicle_id(vehicle_id: str) -> Optional[VehicleID]:
-    # Step 1: Validate format of the Vehicle ID
+    # Validate format of the Vehicle ID
     if not vehicle_id or not isinstance(vehicle_id, str):
         return None
     
-    # Step 2: Split on the hyphens
+    # Split on the hyphens
     parts = vehicle_id.split('-')
 
-    # Step 3: Validate that there are 3 parts to the ID (series-chassis number-car number)
+    # Validate that there are 3 parts to the ID (series-chassis number-car number)
     if len(parts) != 3 or parts[0] != "GR86": # The race data ONLY contains Toyota GR86s
         return None
     
-    # Step 4: Create VehicleID object
+    # Create VehicleID object
     return VehicleID(
         raw=vehicle_id,
         chassis_number=parts[1],
@@ -84,87 +84,77 @@ def is_valid_lap(lap: int) -> bool:
     return lap != INVALID_LAP_NUMBER # Only use valid lap numbers (not using 32768)
 
 def infer_lap_from_timestamp(df: pd.DataFrame, timestamp_col: str = 'timestamp') -> pd.Series:
-    # Step 1: Check if the 'timestamp' column exists
+    # Check if the 'timestamp' column exists
     if timestamp_col not in df.columns:
         return pd.Series([1] * len(df), index=df.index, dtype=int)
     
-    # Step 2: Prepare a working copy and convert the timestamps to datetime format
+    # Prepare a working copy and convert the timestamps to datetime format
     df_work = df.copy()
     df_work[timestamp_col] = pd.to_datetime(df_work[timestamp_col], errors='coerce')
     
-    # Step 3: Sort by vehicle ID and timestamp
+    # Sort by vehicle ID and timestamp
     if 'vehicle_id' in df_work.columns:
         df_work = df_work.sort_values(['vehicle_id', timestamp_col])
     else:
         df_work = df_work.sort_values(timestamp_col)
     
-    # Step 4: Compute time deltas
+    # Compute time deltas
     if 'vehicle_id' in df_work.columns:
         df_work['_time_delta'] = df_work.groupby('vehicle_id')[timestamp_col].diff().dt.total_seconds()
     else:
         df_work['_time_delta'] = df_work[timestamp_col].diff().dt.total_seconds()
     
-    # Step 5: Detect new laps (based on time gaps)
+    # Detect new laps (based on time gaps)
     LAP_GAP_THRESHOLD = 60.0
     df_work['_new_lap'] = (df_work['_time_delta'] > LAP_GAP_THRESHOLD) | (df_work['_time_delta'].isna())
     
-    # Step 6: Generate the lap numbers using the cumulative sum
+    # Generate the lap numbers using the cumulative sum
     if 'vehicle_id' in df_work.columns:
         inferred_laps = df_work.groupby('vehicle_id')['_new_lap'].cumsum() + 1
     else:
         inferred_laps = df_work['_new_lap'].cumsum() + 1
     
-    # Step 7: Restore the original index order
+    # Restore the original index order
     result = pd.Series(index=df.index, dtype=int)
     result.loc[inferred_laps.index] = inferred_laps.values
     result = result.fillna(1).astype(int)
     
     return result
 
-# I LEFT OFF HERE!!!
 def clean_lap_numbers(df: pd.DataFrame, lap_col: str = 'lap', timestamp_col: str = 'timestamp') -> pd.DataFrame:
-    """Clean lap numbers by detecting and replacing invalid values.
-    
-    Args:
-        df: DataFrame with lap and timestamp columns
-        lap_col: Name of lap column
-        timestamp_col: Name of timestamp column
-        
-    Returns:
-        DataFrame with cleaned lap numbers
-    """
+    # Copy the dataframe (We don't want to modify the original)
     df = df.copy()
     
+    # Check if the 'lap' column exists (exit early if not)
     if lap_col not in df.columns:
         return df
     
-    # Convert lap to numeric, coercing errors
+    # Convert 'lap' column to numeric
     df[lap_col] = pd.to_numeric(df[lap_col], errors='coerce')
     
-    # Detect invalid laps
+    # Detect any invalid laps
     invalid_mask = (df[lap_col] == INVALID_LAP_NUMBER) | df[lap_col].isna()
     
+    # Fix the invalid laps
     if invalid_mask.sum() > 0:
-        print(f"Warning: Found {invalid_mask.sum()} invalid lap numbers (lap #{INVALID_LAP_NUMBER} or NaN). Attempting to infer from timestamps.")
+        print(f"WARNING: Found {invalid_mask.sum()} invalid lap numbers (lap #{INVALID_LAP_NUMBER} or NaN). Attempting to infer from timestamps.")
         
-        # Infer laps from timestamps
+        # Reconstruct laps from timestamps
         inferred = infer_lap_from_timestamp(df, timestamp_col)
         
-        # Update invalid laps with inferred values
-        df[lap_col] = df[lap_col].astype('Int64')  # Use nullable int
+        # Update invalid laps with inferred values (use nullable int for NaNs)
+        df[lap_col] = df[lap_col].astype('Int64')
         df.loc[invalid_mask, lap_col] = inferred[invalid_mask].astype('Int64')
     
     return df
 
 
 def list_telemetry_files() -> List[str]:
-    """Find all telemetry CSV files in Datasets/.
-    
-    Returns:
-        List of absolute paths to telemetry files
-    """
+    # Search recursively for telemetry CSV files in the datasets directory
     pattern = os.path.join(DATASETS_DIR, '**', '*telemetry*.*')
     files = glob.glob(pattern, recursive=True)
+    
+    # Return list of absolute paths (excluding __MACOSX folders)
     return [f for f in files if f.lower().endswith('.csv') and '__MACOSX' not in f]
 
 
