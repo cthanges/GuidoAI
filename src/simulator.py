@@ -18,6 +18,7 @@ class BasicSimulator: # Replay lap-by-lap race data (one lap at a time)
         # Stop if there are no more laps
         if not self.has_next():
             raise StopIteration
+
         # Get the current lap and advance to the next
         row = self.laps.iloc[self.pos]
         self.pos += 1
@@ -36,7 +37,7 @@ class BasicSimulator: # Replay lap-by-lap race data (one lap at a time)
 class TelemetrySimulator: # Replay high-frequency telemetry data
     def __init__(self, telemetry_df: pd.DataFrame, speed: float = 1.0, aggregate_by_lap: bool = True, sample_rate_hz: float = 10.0):
         # Initialize the simulator
-        time_col = 'meta_time' if 'meta_time' in telemetry_df.columns else 'timestamp' # Sort data chronologically (meta_time preferred)
+        time_col = 'meta_time' if 'meta_time' in telemetry_df.columns else 'timestamp' # Sort data chronologically ('meta_time' preferred)
 
         self.data = telemetry_df.sort_values(time_col).reset_index(drop=True)
         self.pos = 0
