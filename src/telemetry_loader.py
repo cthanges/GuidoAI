@@ -229,10 +229,10 @@ def telemetry_to_wide_format(df: pd.DataFrame, index_cols: List[str] = ['meta_ti
     
     # Create pivot table (this makes it wide format)
     pivot_df = df_subset.pivot_table(
-        index=[c for c in index_cols if c in df_subset.columns],
-        columns='telemetry_name',
-        values='telemetry_value',
-        aggfunc='first' # If a duplicate exists, take the first value
+        index = [c for c in index_cols if c in df_subset.columns],
+        columns = 'telemetry_name',
+        values = 'telemetry_value',
+        aggfunc = 'first' # If a duplicate exists, take the first value
     ).reset_index()
     
     return pivot_df
