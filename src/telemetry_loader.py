@@ -38,59 +38,47 @@ class TelemetryParameter(Enum):
         self.unit = unit
         self.description = description
 
-
 @dataclass
 class VehicleID:
-    """Parsed vehicle identifier."""
-    raw: str  # Original string (e.g., "GR86-004-78")
-    chassis_number: str  # e.g., "004"
-    car_number: str  # e.g., "78" (may be "000" if not assigned)
+    raw: str # Original string (Ex. "GR86-004-78")
+    chassis_number: str # Ex. 004
+    car_number: str # Ex. 78
     
     @property
     def is_car_number_assigned(self) -> bool:
-        """True if car number is assigned (not 000)."""
-        return self.car_number != "000"
+        # Check if car number is assigned
+        return self.car_number != "000" # 000 means that it has not been assigned to ECU
     
     @property
     def unique_id(self) -> str:
-        """Unique identifier (prefer chassis if car number unassigned)."""
+        # Return unique identifier (chassis preferred if car number is unassigned)
         return f"chassis-{self.chassis_number}" if not self.is_car_number_assigned else self.raw
     
     def __str__(self):
+        # Output one of the following (depending on whether car number is assigned)
         if self.is_car_number_assigned:
             return f"Car #{self.car_number} (Chassis {self.chassis_number})"
+
         return f"Chassis {self.chassis_number} (Car # not assigned)"
 
-
 def parse_vehicle_id(vehicle_id: str) -> Optional[VehicleID]:
-    """Parse vehicle ID from format GR86-XXX-YYY.
-    
-    Args:
-        vehicle_id: String like "GR86-004-78"
-        
-    Returns:
-        VehicleID object or None if parse fails
-        
-    Example:
-        >>> v = parse_vehicle_id("GR86-004-78")
-        >>> v.chassis_number
-        '004'
-        >>> v.car_number
-        '78'
-    """
+    # Step 1: Validate format of the Vehicle ID
     if not vehicle_id or not isinstance(vehicle_id, str):
         return None
     
+    # Step 2: Split on the hyphens
     parts = vehicle_id.split('-')
-    if len(parts) != 3 or parts[0] != "GR86":
+
+    # Step 3: Validate that there are 3 parts to the ID (series-chassis number-car number)
+    if len(parts) != 3 or parts[0] != "GR86": # The race data ONLY contains Toyota GR86s
         return None
     
+    # Step 4: Create VehicleID object
     return VehicleID(
         raw=vehicle_id,
         chassis_number=parts[1],
         car_number=parts[2]
     )
-
 
 def is_valid_lap(lap: int) -> bool:
     """Check if lap number is valid (not the common ECU error value).
