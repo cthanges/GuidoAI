@@ -1,35 +1,27 @@
-"""Real-time anomaly detection for telemetry data.
-
-Detects mechanical issues, driver errors, and performance anomalies from telemetry.
-"""
-
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-
 class AnomalyType(Enum):
-    """Types of anomalies that can be detected."""
-    MECHANICAL_FAILURE = "mechanical_failure"
-    ENGINE_ISSUE = "engine_issue"
-    BRAKE_ISSUE = "brake_issue"
-    DRIVER_ERROR = "driver_error"
-    PERFORMANCE_DROP = "performance_drop"
-    SENSOR_ERROR = "sensor_error"
-
+    # Detected anomaly types
+    MECHANICAL_FAILURE = "Mechanical failure"
+    ENGINE_ISSUE = "Engine issue"
+    BRAKE_ISSUE = "Brake issue"
+    DRIVER_ERROR = "Driver error"
+    PERFORMANCE_DROP = "Performance drop"
+    SENSOR_ERROR = "Sensor error"
 
 class Severity(Enum):
-    """Severity levels for anomalies."""
-    CRITICAL = "critical"  # Immediate action required
-    WARNING = "warning"    # Monitor closely
-    INFO = "info"          # FYI, may be normal
-
+    # Severity levels for listed anomalies
+    CRITICAL = "Critical"
+    WARNING = "Warning"
+    INFO = "Info" # Informational; this could be normal
 
 @dataclass
 class Anomaly:
-    """Detected anomaly with details."""
+    # Detected anomaly details
     type: AnomalyType
     severity: Severity
     message: str
@@ -40,7 +32,7 @@ class Anomaly:
     parameter: Optional[str] = None
     
     def __str__(self):
-        severity_icon = {"critical": "🚨", "warning": "⚠️", "info": "ℹ️"}
+        severity_icon = {"Critical": "🚨", "Warning": "⚠️", "Info": "ℹ️"}
         icon = severity_icon.get(self.severity.value, "")
         return f"{icon} [{self.severity.value.upper()}] {self.message}"
 
