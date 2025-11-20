@@ -39,7 +39,7 @@ with tab1:
     
     with col_a:
         st.subheader("🗂️ Data Source")
-        file_type = st.radio('What type of data do you have?', ['Lap Times', 'Telemetry'], index=0, help="**Lap Times**: Race lap-by-lap data\n**Telemetry**: High-frequency sensor data")
+        file_type = st.radio('What type of data do you have?', ['Lap Times', 'Telemetry'], index=0, help="**Lap Times**: Race lap-by-lap data  \n**Telemetry**: High-frequency sensor data")
         
         if file_type == 'Lap Times':
             files = data_loader.list_lap_time_files()
