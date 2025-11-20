@@ -12,15 +12,28 @@ from src import telemetry_loader
 
 st.set_page_config(page_title="GuidoPro", layout='wide', page_icon="Logo.png")
 
+# Remove the header anchor links
+st.markdown("""
+<style>
+    /* Hide header anchor links */
+    h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+        display: none !important;
+    }
+    header[data-testid="stHeader"] {
+        pointer-events: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Display title
 st.title('GuidoPro')
 
 # Main workflow tabs
-tab1, tab2, tab3 = st.tabs(["📁 Setup", "🏁 Race Analysis", "🔧 Advanced Settings"])
+tab1, tab2, tab3 = st.tabs(["Setup", "Race Analysis", "Advanced Settings"])
 
 # ========== TAB 1: SETUP ==========
 with tab1:
-    st.header("Step 1: Select Your Data")
+    st.header("Step 1: Data & Vehicle Selection")
     
     col_a, col_b = st.columns(2)
     
