@@ -22,6 +22,19 @@ st.markdown("""
     header[data-testid="stHeader"] {
         pointer-events: none;
     }
+    
+    /* Make subheaders grey */
+    h3 {
+        color: #808080 !important;
+    }
+    
+    /* Make background fully black */
+    .stApp {
+        background-color: #000000 !important;
+    }
+    .main .block-container {
+        background-color: #000000 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,15 +51,15 @@ with tab1:
     col_a, col_b = st.columns(2)
     
     with col_a:
-        st.subheader("🗂️ Data Source")
+        st.subheader("Data")
         file_type = st.radio('What type of data do you have?', ['Lap Times', 'Telemetry'], index=0, help="**Lap Times**: Race lap-by-lap data  \n**Telemetry**: High-frequency sensor data")
         
         if file_type == 'Lap Times':
             files = data_loader.list_lap_time_files()
-            label = 'Select your race data'
+            label = 'Select your data'
         else:
             files = telemetry_loader.list_telemetry_files()
-            label = 'Select your telemetry data'
+            label = 'Select your data'
         
         if files:
             choice = st.selectbox(label, options=files, help="CSV files auto-detected from Datasets/ folder")
@@ -55,7 +68,7 @@ with tab1:
             choice = st.file_uploader(f'Upload CSV', type=['csv'])
     
     with col_b:
-        st.subheader("🏎️ Vehicle Selection")
+        st.subheader("Vehicle")
         
         # Vehicle selection (will be populated after file choice)
         if choice:
