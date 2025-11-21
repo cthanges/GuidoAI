@@ -149,7 +149,29 @@ with tab2:
         st.warning("⚠️ Please complete the **Setup** tab first!")
         st.stop()
     
-    # Quick settings reminder
+    # Advanced Features Section
+    with st.expander("🔧 Advanced Features", expanded=False):
+        col_adv1, col_adv2 = st.columns(2)
+        
+        with col_adv1:
+            enable_traffic = st.checkbox('Enable traffic analysis', value=False, help='Detect undercut/overcut opportunities')
+            if enable_traffic:
+                endurance_files = list(Path('Datasets').rglob('*AnalysisEndurance*.CSV'))
+                if endurance_files:
+                    endurance_choice = st.selectbox('Traffic data file', 
+                                                  options=[str(f) for f in endurance_files])
+                else:
+                    st.info('No endurance files found')
+                    endurance_choice = None
+                    enable_traffic = False
+        
+        with col_adv2:
+            enable_caution = st.checkbox('Enable caution analysis', value=False, help='Predict caution flags probability')
+            if enable_caution:
+                cautions_per_race = st.slider('Expected cautions', 0.0, 5.0, 2.0, 0.5)
+                show_caution_details = st.checkbox('Show details', value=False)
+    
+    # Current Configuration summary
     with st.expander("📋 Current Configuration", expanded=False):
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Race Laps", total_race_laps)
@@ -157,10 +179,8 @@ with tab2:
         col3.metric("Degradation", f"{degradation_rate} s/lap")
         col4.metric("Max Stint", f"{target_stint} laps")
 
-# Store in sidebar for compatibility
+# Store in sidebar for compatibility (hidden)
 with st.sidebar:
-    st.header('Quick Settings')
-    
     # Store all settings in sidebar (hidden/collapsed)
     if 'choice' not in locals() or not choice:
         choice = None
@@ -171,28 +191,8 @@ with st.sidebar:
         pit_cost = 20.0
         degradation_rate = 0.15
         total_race_laps = 50
-    
-    st.markdown('---')
-    st.header('Advanced Features')
-    enable_traffic = st.checkbox('Enable traffic analysis', 
-                                 value=False, 
-                                 help='Detect undercut/overcut opportunities')
-    if enable_traffic:
-        endurance_files = list(Path('Datasets').rglob('*AnalysisEndurance*.CSV'))
-        if endurance_files:
-            endurance_choice = st.selectbox('Traffic data file', 
-                                          options=[str(f) for f in endurance_files])
-        else:
-            st.info('No endurance files found')
-            endurance_choice = None
-            enable_traffic = False
-    
-    enable_caution = st.checkbox('Enable caution analysis', 
-                                 value=False,
-                                 help='Predict caution flags probability')
-    if enable_caution:
-        cautions_per_race = st.slider('Expected cautions', 0.0, 5.0, 2.0, 0.5)
-        show_caution_details = st.checkbox('Show details', value=False)
+        enable_traffic = False
+        enable_caution = False
 
 if not choice:
     st.info('👈 Complete the Setup tab to begin')
