@@ -12,6 +12,34 @@ from src import telemetry_loader
 
 st.set_page_config(page_title="GuidoPro", layout='wide', page_icon="Logo.png")
 
+def detect_total_laps(data_file_path: str) -> int:
+    # Detect the total number of laps from each track's results file
+    try:
+        if not isinstance(data_file_path, str):
+            return 50 # Default fallback
+        
+        # Get directory of the data file
+        data_dir = Path(data_file_path).parent
+        
+        # Look for results files (try both uppercase and lowercase)
+        results_files = list(data_dir.glob('*Results*.CSV')) + list(data_dir.glob('*Results*.csv'))
+        
+        if not results_files:
+            return 50 # Default if no results file found
+        
+        # Read the first results file
+        results_df = pd.read_csv(results_files[0], sep=';', nrows=5)
+        
+        if 'LAPS' in results_df.columns:
+            # Get the maximum laps value (should be consistent for all finishers)
+            max_laps = results_df['LAPS'].max()
+            if pd.notna(max_laps) and max_laps > 0:
+                return int(max_laps)
+        
+        return 50 # Default fallback
+    except Exception:
+        return 50 # Default fallback on any error
+
 # Remove the header anchor links
 st.markdown("""
 <style>
@@ -101,36 +129,26 @@ with tab1:
         st.markdown("---")
         st.header("Step 2: Race Parameter Configuration")
         
+        # Auto-detect total laps from results file
+        detected_laps = detect_total_laps(choice)
+        
         col_p1, col_p2, col_p3 = st.columns(3)
         
         with col_p1:
             st.subheader("Race Setup")
-            total_race_laps = st.number_input('Total race laps', min_value=10, max_value=200, value=50, help="How many laps in this race?")
-            target_stint = st.number_input('Max stint length (laps)', 
-                                          min_value=1, 
-                                          max_value=100, 
-                                          value=20,
-                                          help="Maximum laps on a single set of tires")
+            if detected_laps != 50:
+                st.success(f"🎯 Auto-detected: {detected_laps} laps")
+            total_race_laps = st.number_input('Total race laps', min_value=10, max_value=200, value=detected_laps, help="Auto-detected from race results (you can edit if needed)")
+            target_stint = st.number_input('Max stint length (laps)', min_value=1, max_value=100, value=20, help="Maximum laps on a single set of tires")
         
         with col_p2:
             st.subheader("Car Setup")
-            pit_cost = st.number_input('Pit stop time (seconds)', 
-                                      min_value=5.0, 
-                                      max_value=120.0, 
-                                      value=20.0,
-                                      help="Time lost entering, stopping, and exiting pit lane")
-            degradation_rate = st.number_input('Tire degradation (s/lap)', 
-                                              min_value=0.0, 
-                                              max_value=1.0, 
-                                              value=0.15, 
-                                              step=0.05,
-                                              help="How much slower per lap on worn tires")
+            pit_cost = st.number_input('Pit stop time (s)', min_value=5.0, max_value=120.0, value=20.0, help="Time lost entering, stopping, and exiting pit lane")
+            degradation_rate = st.number_input('Tire degradation (seconds/lap)', min_value=0.0, max_value=1.0, value=0.15, step=0.05, help="How much slower per lap on worn tires")
         
         with col_p3:
             st.subheader("Replay Speed")
-            speed = st.slider('Laps per second', 
-                            0.1, 5.0, 1.0,
-                            help="How fast to replay the race simulation")
+            speed = st.slider('Laps per second', 0.1, 5.0, 1.0, help="How fast to replay the race simulation")
             st.info(f"💡 **{speed} laps/sec** = {60/speed:.1f} seconds per lap")
         
         st.success("✅ Configuration complete! Head to **Race Analysis** to start →")
@@ -140,7 +158,7 @@ with tab1:
 # ========== TAB 2: RACE ANALYSIS (Main Features) ==========
 with tab2:
     if not choice or not vehicle:
-        st.warning("⚠️ Please complete the **Setup** tab first!")
+        st.warning("⚠️ Please complete the **Setup** first!")
         st.stop()
     
     # Advanced Features Section
@@ -152,8 +170,7 @@ with tab2:
             if enable_traffic:
                 endurance_files = list(Path('Datasets').rglob('*AnalysisEndurance*.CSV'))
                 if endurance_files:
-                    endurance_choice = st.selectbox('Traffic data file', 
-                                                  options=[str(f) for f in endurance_files])
+                    endurance_choice = st.selectbox('Traffic data file', options=[str(f) for f in endurance_files])
                 else:
                     st.info('No endurance files found')
                     endurance_choice = None
@@ -189,7 +206,7 @@ with st.sidebar:
         enable_caution = False
 
 if not choice:
-    st.info('👈 Complete the Setup tab to begin')
+    st.info('👈 Complete the **Setup** to begin')
     st.stop()
 
 # Load data based on file type (moved inside tab2)
