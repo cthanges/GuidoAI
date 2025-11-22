@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large Dataset Files (27+ GB)
+# Datasets/
+*.zip
+
+# Telemetry files (add others later)
+*telemetry*.csv
+
+# Unused dataset files (save space)
+*lap_start*.csv
+*lap_end*.csv
+*Weather*.csv
+*Best_10_Laps*.CSV
+*Best*Laps*.CSV
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Temporary files
+*.log
+*.tmp
+temp/
+tmp/
+
+# Track map extraction outputs (if generated)
+TrackMaps/
+*.png
+*.jpg
+*.jpeg
+
+# Keep these exceptions (sample data for documentation)
+!sample_data.csv
+!README.md
